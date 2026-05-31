@@ -1,9 +1,18 @@
 from sage.all import *
-import copy
-from functions import *
+import copy as pycopy
+from libs.functions import *
 
 
 class DFV:
+    """
+    class DFV: for managing Delaunay with faces and dual(Voronoi).
+
+    D: Delaunay graph;
+
+    F: Faces of Delaunay;
+    
+    V: Voronoi dual of D.
+    """
     id = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5}
     
     def __init__(self,D,F,V,is_interior=False,is_canonical=False):
@@ -46,7 +55,7 @@ class DFV:
         return DFV(d,f,v)
 
     def remove_multiple_edges(self,indices,is_interior=True):
-        d, f, v = [copy.deepcopy(x) for x in (self.D, self.F, self.V)]
+        d, f, v = [pycopy.deepcopy(x) for x in (self.D, self.F, self.V)]
         e_list = self.D.edges()
         for i in indices:
             d.delete_edge(e_list[i])
@@ -56,7 +65,7 @@ class DFV:
     @property
     def poly(self):
         if self._poly: return self._poly
-        self._poly = poly(self.D,self.F,self.V)
+        self._poly = poly(self.D,self.F)
         self._dim = self.poly.dim()
         return self._poly
     
