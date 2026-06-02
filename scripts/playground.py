@@ -4,9 +4,9 @@ sys.path.append("/home/ccsghk/CellularDecomposition")
 import os
 import sys
 
-print("cwd =", os.getcwd())
-print("file =", __file__)
-print("sys.path[0:3] =", sys.path[0:3])
+# print("cwd =", os.getcwd())
+# print("file =", __file__)
+# print("sys.path[0:3] =", sys.path[0:3])
 
 from libs.DFV import DFV
 from libs.functions import *

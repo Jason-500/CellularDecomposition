@@ -13,7 +13,7 @@ class NotWellDefinedError(ValueError):
 class PolyComplexSolver:
     def __init__(self,initial_dfv_list):
         """
-        class PolyComplexModuli: for managing the whole complex.
+        class PolyComplexSolver: for managing the complex decomposition.
         """
         self.top_cell_dim = None
         for dfv in initial_dfv_list:
