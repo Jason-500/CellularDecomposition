@@ -112,3 +112,20 @@ class DFV:
     def set_canonical(self):
         self.is_canonical = True
         self.canonical_image = (self,DFV.id)
+
+    def automorphism_group(self):
+        original_grp = self.D.automorphism_group()
+        canonical_faces = [canonical_face(f) for f in self.F]
+        group_element_list = []
+        for g in original_grp:
+            current_map_dict = {v: g(v) for v in self.D.vertices()}
+            mapping_func = lambda a: current_map_dict[a]
+            is_valid = True
+            for fi in self.F:
+                if canonical_image(fi,mapping_func) not in canonical_faces:
+                    is_valid = False
+                    break
+            if is_valid:
+                group_element_list.append(g)
+
+        return PermutationGroup(group_element_list)

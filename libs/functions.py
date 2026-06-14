@@ -165,8 +165,8 @@ def flipped_canonical_face(face):
 
 def canonical_image(face,map):
     image = canonical_face([
-        (map(u),map(v))
-        for (u,v,_) in face
+        (map(edge[0]),map(edge[1]))
+        for edge in face
     ])
     return image
 
