@@ -30,6 +30,7 @@ class DFV:
         self._poly = None
         self._dim = None
         self._faces = None
+        self._edge_labels = [label for _,_,label in D.edges()]
 
         self.is_interior = None
         if is_interior: 
@@ -99,6 +100,10 @@ class DFV:
         self._faces=[raw_interior_faces,raw_boundary_faces]
         return self._faces
         
+    @property
+    def edge_labels(self):
+        return self._edge_labels
+    
     def return_DFV_tuple(self):
         return (self.D,self.F,self.V)
 
