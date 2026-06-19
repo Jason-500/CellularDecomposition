@@ -1,5 +1,8 @@
 from sage.all import *
 from sage.geometry.polyhedron.constructor import Polyhedron
+from itertools import combinations
+
+from libs.DFV import DFV
 
 def is_edge_on_face(edge,face):
     """
@@ -205,4 +208,124 @@ def is_orientation_preserving_isomorphic(DFV1, DFV2):
         
         return False, None
 
+def cyclic_match_position(source_word, target_word):
+    """
+    找 source_word 与 target_word 的有向循环匹配位移.
+    若不存在, 返回 None.
+
+    返回 shift, 使得:
+        source_word[k] == target_word[(k + shift) % n]
+    """
+    n = len(source_word)
+
+    if n != len(target_word):
+        return None
+
+    for shift in range(n):
+        if all(
+            source_word[k] == target_word[(k + shift) % n]
+            for k in range(n)
+        ):
+            return shift
+
+    return None
+
+def induced_edge_label_perm_from_faces(dfv:DFV,g):
+    """
+    给定 DFV 和置换 g 求解边置换的 dict. 
+    若 perm 不保持面集 F, 返回None.
+
+    返回 label_perm, 使得
+        label_perm[old_label] == new_label.
+    """
+    target_words = [
+        [(u, v) for u, v, _ in face]
+        for face in dfv.F
+    ]
+
+    label_perm = {}
+
+    for source_face in dfv.F:
+        mapped_word = [
+            (g(u), g(v))
+            for u, v, _ in source_face
+        ]
+
+        match = None
+
+        for j, target_word in enumerate(target_words):
+            shift = cyclic_match_position(mapped_word, target_word)
+
+            if shift is not None:
+                match = (j, shift)
+                break
+
+        if match is None:
+            return None
+            
+        j, shift = match
+        target_face = dfv.F[j]
+        n = len(source_face)
+
+        for k, (_, _, source_label) in enumerate(source_face):
+            target_label = target_face[(k + shift) % n][2]
+
+            if source_label in label_perm:
+                if label_perm[source_label] != target_label:
+                    return None
+            else:
+                label_perm[source_label] = target_label
+
+    return label_perm
+
+def orbits_of_perm(label_perm, labels):
+    """
+    label_perm: dict, 表示单个 perm 的作用: label -> label
+    labels: 所有 label 列表
+
+    返回: 所有轨道
+    """
+    seen = []
+    orbits = []
+
+    for x in labels:
+        if x in seen:
+            continue
+
+        orbit = []
+        cur = x
+
+        while cur not in orbit:
+            orbit.append(cur)
+            cur = label_perm[cur]
+
+        orbits.append(orbit)
+        seen += orbit
+
+    return orbits
+
+def delaunay_edge_orbit_of_g(dfv:DFV, g):
+    """
+    给定 DFV 和顶点置换 g 求解边置换的轨道.
+
+    返回: 所有边的轨道
+    """
+    labels = dfv.edge_labels
+    label_perm = induced_edge_label_perm_from_faces(dfv,g)
+
+    return orbits_of_perm(label_perm,labels)
+
+def constraints_from_orbits(orbits,labels):
+    """
+    从 orbits 求解 Polyhedron 构造函数所需的线性条件.
+    """
+    n = len(labels) # amount of parameters
+    eq_constraints = [[0]*(n+1)]
+
+    for orbit in orbits:
+        for a, b in combinations(orbit, 2):
+            eq_constraints.append(
+                [0]+[1 if a == label else -1 if b == label else 0 for label in labels]
+            )
     
+    return eq_constraints
