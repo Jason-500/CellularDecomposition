@@ -18,7 +18,7 @@ class DFV:
     edge_id = {f"x{i}": f"x{i}" for i in range(1, 13)}
     id = [vertex_id,edge_id]
     
-    def __init__(self,D,F,V,is_interior=False,is_canonical=False):
+    def __init__(self,D,F,V,is_interior=False,is_canonical=False,is_root_cell=False,root_cell=None,poly=None):
         """
         class DFV: for managing Delaunay with faces and dual(Voronoi).
         D: Delaunay graph;
@@ -30,11 +30,14 @@ class DFV:
         self.V = V
         self.card_E = len(D.edges())
         self.card_F = len(F)
-        self._poly = None
+        self._poly = poly
+        self._canonical_poly = None
         self._dim = None
-        self._facets = None
         self._faces = {}
+        self._canonical_faces = {}
         self._edge_labels = [label for _,_,label in D.edges()]
+        self._is_root_cell = is_root_cell
+        self._root_cell = root_cell
 
         self.is_interior = None
         if is_interior: 
@@ -45,33 +48,43 @@ class DFV:
         if is_canonical: 
             self.is_canonical = True
             self.canonical_image = (self,DFV.id)
-
-        # self.edge_dict = *under construction*
         
-        
-    def remove_single_edge(self,i):
-        """
-        Return the subgraphs obtained by removing ith edge from given Delaunay graph D, with modification of F and V.
-        """
-        d = self.D.copy()
-        ei = d.edges()[i]
-        d.delete_edge(ei)
-        f,v = modified_faces_with_voronoi(ei,self.F,self.V)
-        return DFV(d,f,v)
+        self._face_dict = {}
+        self._all_faces_loaded = False
 
-    def remove_multiple_edges(self,indices,is_interior=True):
+    # def remove_single_edge(self,i):
+    #     """
+    #     Return the subgraphs obtained by removing ith edge from given Delaunay graph D, with modification of F and V.
+    #     """
+    #     d = self.D.copy()
+    #     ei = d.edges()[i]
+    #     d.delete_edge(ei)
+    #     f,v = modified_faces_with_voronoi(ei,self.F,self.V)
+    #     return DFV(d,f,v)
+
+    def remove_multiple_edges(self,indices, is_interior=True, poly = None):
         d, f, v = [pycopy.deepcopy(x) for x in (self.D, self.F, self.V)]
         e_list = self.D.edges()
         for i in indices:
             d.delete_edge(e_list[i])
             f,v = modified_faces_with_voronoi(e_list[i],f,v)
-        return DFV(d,f,v,is_interior)
+        return DFV(d,f,v,is_interior, root_cell = self, poly = poly)
     
+    @property
+    def is_root_cell(self):
+        return self._is_root_cell
+    
+    @property
+    def root_cell(self):
+        if not self.is_root_cell:
+            return self._root_cell
+        else:
+            return self
+
     @property
     def poly(self):
         if self._poly: return self._poly
-        self._poly = poly(self.D,self.F)
-        self._dim = self.poly.dim()
+        self._poly = self.canonical_poly
         return self._poly
     
     @property
@@ -82,69 +95,139 @@ class DFV:
     def edge_labels(self):
         return self._edge_labels
     
-    # def facets(self):
-    #     """
-    #     Return the facets: [interior faces, boundary faces]
-    #     """
-    #     if self._facets: return self._facets
-    #     raw_interior_faces = []
-    #     raw_boundary_faces = []
-    #     voronoi_edge_dict = {label:(start,end) for start,end,label in self.V.edges()}
-    #     for face in self.poly.facets():
-    #         center = face.as_polyhedron().center()
-    #         index_of_collapsed_edges = [i for i, x in enumerate(center) if x == 1]
-    #         labels_of_collapsed_edges = [self.D.edges()[i][2] for i in index_of_collapsed_edges]
-
-    #         if 0 in center: # non-separating degeneration
-    #             raw_boundary_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=False))
-
-    #         elif not Graph([voronoi_edge_dict[label] for label in labels_of_collapsed_edges],multiedges=True, loops=True).is_forest(): 
-    #             # separating degeneration. I think it will always occur by pinching a single selfloop in V. But first we still detect the loop.
-    #             raw_boundary_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=False))
-
-    #         else:
-    #             raw_interior_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=True))
-    #     self._facets=[raw_interior_faces,raw_boundary_faces]
-    #     return self._facets
-    # 
-    # Reuse faces():
-    def facets(self):
-        return self.faces(1)
+    @property
+    def canonical_poly(self):
+        if self._canonical_poly: return self._canonical_poly
+        self._canonical_poly = poly(self.D,self.F)
+        self._dim = self._canonical_poly.dim()
+        return self._canonical_poly
     
-    def faces(self, dim):
-        """
-        Return the faces with given dimension: [interior faces, boundary faces]
-        """
-        if dim in self._faces: return self._faces[dim]
+    @property
+    def face_dict(self): # 暂时face_dict只做了interior face.
+        if not self.is_root_cell:
+            return self.root_cell.face_dict
+        else:
+            if self._all_faces_loaded: return self._face_dict
+            self._init_faces()
+            self._all_faces_loaded = True
+            return self._face_dict
+        
+    def _init_faces(self, dim=None, solve_boundary_cells = False):
+        if dim is None:
+            for d in range(self.dim + 1):
+                self._init_faces(d, solve_boundary_cells)
+            return
+
         raw_interior_faces = []
-        raw_boundary_faces = []
+        if solve_boundary_cells:
+            raw_boundary_faces = []
+
         voronoi_edge_dict = {label:(start,end) for start,end,label in self.V.edges()}
-        for face in self.poly.faces(dim):
-            center = face.as_polyhedron().center()
+        for face in self.canonical_poly.faces(dim):
+            poly = face.as_polyhedron()
+            center = poly.center()
             index_of_collapsed_edges = [i for i, x in enumerate(center) if x == 1]
             labels_of_collapsed_edges = [self.D.edges()[i][2] for i in index_of_collapsed_edges]
+            labels_of_remained_edges = frozenset([self.D.edges()[i][2] for i in [i for i, x in enumerate(center) if x != 1]])
 
             if 0 in center: # non-separating degeneration
-                raw_boundary_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=False))
+                if solve_boundary_cells:
+                    raw_boundary_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=False,poly=poly))
 
             elif not Graph([voronoi_edge_dict[label] for label in labels_of_collapsed_edges],multiedges=True, loops=True).is_forest(): 
                 # separating degeneration. I think it will always occur by pinching a single selfloop in V. But first we still detect the loop.
-                raw_boundary_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=False))
+                if solve_boundary_cells:
+                    raw_boundary_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=False,poly=poly))
 
             else:
-                raw_interior_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=True))
-        self._faces[dim]=[raw_interior_faces,raw_boundary_faces]
+                if self.is_root_cell: 
+                    # 以下仅在生成face_dict时使用.
+                    generated_face = self.remove_multiple_edges(index_of_collapsed_edges,is_interior=True,poly=poly)
+                    raw_interior_faces.append(generated_face)
+                    self._face_dict[labels_of_remained_edges] = generated_face
+                else: 
+                    raw_interior_faces.append(self.face_dict[labels_of_remained_edges])
+        
+        self._faces[dim]=[raw_interior_faces,[]]
+        if solve_boundary_cells:
+            self._faces[dim][1] = raw_boundary_faces
+
+    def faces(self, dim=None, solve_boundary_cells = False):
+        """
+        Return the faces with given dimension: [interior faces, boundary faces]
+        """
+
+        if dim is None:
+            self._init_faces(solve_boundary_cells = solve_boundary_cells)
+            return {
+                d: self.faces(d)
+                for d in range(self.dim + 1)
+            }
+        
+        if dim in self._faces: 
+            return self._faces[dim]
+
+        self._init_faces(dim, solve_boundary_cells)
         return self._faces[dim]
+    
+    def facets(self, solve_boundary_cells = False):
+        return self.faces(self.dim - 1, solve_boundary_cells)
+    
+    def canonical_faces(self, dim, solve_boundary_cells = False):
+        if dim in self._canonical_faces: return self._canonical_faces[dim]
+        new_interior_cell_list = []
+        if solve_boundary_cells:
+            new_boundary_cell_list = []
+
+        interior_faces, boundary_faces = self.faces(dim, solve_boundary_cells)
+
+        for interior_face in interior_faces:
+            is_canonical = True
+            for interior_cell in new_interior_cell_list:
+                is_isomorphic, permutation = interior_cell.is_orientation_preserving_isomorphic_to(interior_face)
+                if is_isomorphic:
+                    interior_face.is_canonical = False
+                    interior_face.canonical_image = (interior_cell,permutation) # may need to fix the direction of map here.
+                    is_canonical = False
+                    break
+            if is_canonical:
+                interior_face.set_canonical()
+                new_interior_cell_list.append(interior_face)
+
+        if solve_boundary_cells:
+            for boundary_face in boundary_faces:
+                is_canonical = True
+                for boundary_cell in new_boundary_cell_list:
+                    is_isomorphic, permutation = boundary_cell.is_orientation_preserving_isomorphic_to(boundary_face)
+                    if is_isomorphic:
+                        boundary_face.is_canonical = False
+                        boundary_face.canonical_image = (boundary_cell,permutation) # may need to fix the direction of map here.
+                        is_canonical = False
+                        break
+                if is_canonical:
+                    boundary_face.set_canonical()
+                    new_boundary_cell_list.append(boundary_face)
+
+        self._canonical_faces[dim] = [new_interior_cell_list,[]]
+        if solve_boundary_cells:
+            self._canonical_faces[dim][1] = new_boundary_cell_list
+        return self._canonical_faces[dim]
+
+    def canonical_facets(self, solve_boundary_cells = False):
+        return self.canonical_faces(self.dim - 1, solve_boundary_cells)
+    
+    # def solve_all_canonical_faces(self, solve_boundary_cells = False):
+
 
     def return_DFV_tuple(self):
         return (self.D,self.F,self.V)
 
-    def is_orientation_preserving_isomorphic_to(self, dfv):
-        return is_orientation_preserving_isomorphic(self, dfv)
+    def is_orientation_preserving_isomorphic_to(self, dfv, return_map = True):
+        return is_orientation_preserving_isomorphic(self, dfv, return_map)
 
-    def set_canonical_image(self,dfv,iso):
+    def set_canonical_image(self,dfv,v_iso,e_iso):
         self.is_canonical = False
-        self.canonical_image = (dfv,iso)
+        self.canonical_image = (dfv,[v_iso,e_iso])
 
     def set_canonical(self):
         self.is_canonical = True
@@ -190,39 +273,42 @@ def canonical_image(face,map):
     ])
     return image
 
-def is_orientation_preserving_isomorphic(DFV1:DFV, DFV2:DFV):
-    if not DFV1.V.is_isomorphic(DFV2.V):
+def is_orientation_preserving_isomorphic(dfv1:DFV, dfv2:DFV, return_map = True):
+    if not dfv1.V.is_isomorphic(dfv2.V):
         return False, None
     
     # 检查 Delaunay 图是否同构
-    is_iso, iso_map = DFV1.D.is_isomorphic(DFV2.D, certificate=True)
+    is_iso, iso_map = dfv1.D.is_isomorphic(dfv2.D, certificate=True)
 
     # 一个特判: 把0维退化胞腔丢掉.
-    if DFV1.poly.is_empty():
+    if dfv1.poly.is_empty():
         return True, iso_map
 
     if not is_iso:
         # print("not iso") 
         return False, None
     else:
-        canonical_f2 = [canonical_face(f2) for f2 in DFV2.F]
+        canonical_f2 = [canonical_face(f2) for f2 in dfv2.F]
         
-        for phi in DFV1.D.automorphism_group():
+        for phi in dfv1.D.automorphism_group():
             # 构造顶点置换dict
-            current_map_dict = {v: iso_map[phi(v)] for v in DFV1.D.vertices()}
+            current_map_dict = {v: iso_map[phi(v)] for v in dfv1.D.vertices()}
             
             mapping_func = lambda a: current_map_dict[a]
             
             is_iso = True
-            for f1 in DFV1.F: # 检查所有面是否保持定向
+            for f1 in dfv1.F: # 检查所有面是否保持定向
                 if all(f2 != canonical_image(f1, mapping_func) for f2 in canonical_f2):
                     is_iso = False
                     break
             
-            # 如果找到了保持定向的同构，返回 True 和该顶点映射字典
+            # 如果找到了保持定向的同构，返回 True 和顶点+边映射字典
             if is_iso: 
-                return True, current_map_dict
-        
+                if return_map:
+                    edge_label_map = get_edge_label_map(dfv1,dfv2,lambda x: current_map_dict[x])
+                    return True, [current_map_dict, edge_label_map]
+                else:
+                    return True, None
         return False, None
 
 def cyclic_match_position(source_word, target_word):
@@ -247,24 +333,25 @@ def cyclic_match_position(source_word, target_word):
 
     return None
 
-def induced_edge_label_perm_from_faces(dfv:DFV,g):
+def get_edge_label_map(dfv1:DFV, dfv2:DFV, mapping):
     """
-    给定 DFV 和置换 g 求解边置换的 dict. 
-    若 perm 不保持面集 F, 返回None.
+    给定映射 mapping: dfv1 -> dfv2 求解边映射的 dict. 
+    若 mapping 不保持面集 F, 返回None.
 
     返回 label_perm, 使得
         label_perm[old_label] == new_label.
     """
+
     target_words = [
         [(u, v) for u, v, _ in face]
-        for face in dfv.F
+        for face in dfv2.F
     ]
 
     label_perm = {}
 
-    for source_face in dfv.F:
+    for source_face in dfv1.F:
         mapped_word = [
-            (g(u), g(v))
+            (mapping(u), mapping(v))
             for u, v, _ in source_face
         ]
 
@@ -281,7 +368,7 @@ def induced_edge_label_perm_from_faces(dfv:DFV,g):
             return None
             
         j, shift = match
-        target_face = dfv.F[j]
+        target_face = dfv2.F[j]
         n = len(source_face)
 
         for k, (_, _, source_label) in enumerate(source_face):
@@ -294,6 +381,17 @@ def induced_edge_label_perm_from_faces(dfv:DFV,g):
                 label_perm[source_label] = target_label
 
     return label_perm
+
+def get_edge_label_permutation(dfv:DFV,g):
+    """
+    给定 DFV 和置换 g 求解边置换的 dict. 
+    若 perm 不保持面集 F, 返回None.
+
+    返回 label_perm, 使得
+        label_perm[old_label] == new_label.
+    """
+    return get_edge_label_map(dfv,dfv,g)
+
 
 def orbits_of_perm(label_perm, labels):
     """
@@ -328,7 +426,7 @@ def delaunay_edge_orbit_of_g(dfv:DFV, g):
     返回: 所有边的轨道
     """
     labels = dfv.edge_labels
-    label_perm = induced_edge_label_perm_from_faces(dfv,g)
+    label_perm = get_edge_label_permutation(dfv,g)
 
     return orbits_of_perm(label_perm,labels)
 
