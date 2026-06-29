@@ -1,6 +1,6 @@
 from sage.all import *
 import copy as pycopy
-from libs.functions import *
+from libs.Functions import *
 
 from itertools import combinations
 

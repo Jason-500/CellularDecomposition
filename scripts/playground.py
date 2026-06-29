@@ -9,7 +9,7 @@ import sys
 # print("sys.path[0:3] =", sys.path[0:3])
 
 from libs.DFV import DFV
-from libs.functions import *
+from libs.Functions import *
 from libs.PolyComplexSolver import PolyComplexSolver
 from data.DFVdata import *
 

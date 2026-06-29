@@ -1,13 +1,6 @@
 from sage.all import *
-from libs.functions import *
-
-class DimensionMismatchError(ValueError):
-    """Dimension mismatch."""
-    pass   
-
-class NotWellDefinedError(ValueError):
-    """Needs to be well defined."""
-    pass  
+from libs.Functions import *
+from libs.CustomErrors import *
 
 
 class PolyComplexSolver:
