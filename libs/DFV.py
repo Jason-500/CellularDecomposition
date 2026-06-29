@@ -173,8 +173,18 @@ class DFV:
     def facets(self, solve_boundary_cells = False):
         return self.faces(self.dim - 1, solve_boundary_cells)
     
-    def canonical_faces(self, dim, solve_boundary_cells = False):
-        if dim in self._canonical_faces: return self._canonical_faces[dim]
+    def init_canonical_faces(self, dim = None, solve_boundary_cells = False):
+        if not self.is_root_cell:
+            self.root_cell.init_canonical_faces(dim, solve_boundary_cells)
+            return
+        
+        if dim is None:
+            for d in range(self.dim + 1):
+                self.init_canonical_faces(d, solve_boundary_cells)
+            return
+        
+        if dim in self._canonical_faces: return
+
         new_interior_cell_list = []
         if solve_boundary_cells:
             new_boundary_cell_list = []
@@ -211,6 +221,74 @@ class DFV:
         self._canonical_faces[dim] = [new_interior_cell_list,[]]
         if solve_boundary_cells:
             self._canonical_faces[dim][1] = new_boundary_cell_list
+
+    def canonical_faces(self, dim = None, solve_boundary_cells = False):
+
+        if dim is None:
+            self._init_faces(solve_boundary_cells = solve_boundary_cells)
+            return {
+                d: self.canonical_faces(d)
+                for d in range(self.dim + 1)
+            }
+
+        if dim in self._canonical_faces: return self._canonical_faces[dim]
+
+        self.init_canonical_faces(dim, solve_boundary_cells)
+        if not self.is_root_cell:
+            new_interior_cell_list = []
+
+            interior_faces, boundary_faces = self.faces(dim, solve_boundary_cells)
+
+            for interior_face in interior_faces:
+                if interior_face.canonical_image[0] not in new_interior_cell_list:
+                    new_interior_cell_list.append(interior_face.canonical_image[0])
+
+            self._canonical_faces[dim] = [new_interior_cell_list,[]]
+
+            if solve_boundary_cells:
+                new_boundary_cell_list = []
+                for boundary_face in boundary_faces:
+                    if boundary_face.canonical_image[0] not in new_boundary_cell_list:
+                        new_boundary_cell_list.append(boundary_face.canonical_image[0])
+
+                self._canonical_faces[dim][1] = new_boundary_cell_list
+
+        # new_interior_cell_list = []
+        # if solve_boundary_cells:
+        #     new_boundary_cell_list = []
+
+        # interior_faces, boundary_faces = self.faces(dim, solve_boundary_cells)
+
+        # for interior_face in interior_faces:
+        #     is_canonical = True
+        #     for interior_cell in new_interior_cell_list:
+        #         is_isomorphic, permutation = interior_cell.is_orientation_preserving_isomorphic_to(interior_face)
+        #         if is_isomorphic:
+        #             interior_face.is_canonical = False
+        #             interior_face.canonical_image = (interior_cell,permutation) # may need to fix the direction of map here.
+        #             is_canonical = False
+        #             break
+        #     if is_canonical:
+        #         interior_face.set_canonical()
+        #         new_interior_cell_list.append(interior_face)
+
+        # if solve_boundary_cells:
+        #     for boundary_face in boundary_faces:
+        #         is_canonical = True
+        #         for boundary_cell in new_boundary_cell_list:
+        #             is_isomorphic, permutation = boundary_cell.is_orientation_preserving_isomorphic_to(boundary_face)
+        #             if is_isomorphic:
+        #                 boundary_face.is_canonical = False
+        #                 boundary_face.canonical_image = (boundary_cell,permutation) # may need to fix the direction of map here.
+        #                 is_canonical = False
+        #                 break
+        #         if is_canonical:
+        #             boundary_face.set_canonical()
+        #             new_boundary_cell_list.append(boundary_face)
+
+        # self._canonical_faces[dim] = [new_interior_cell_list,[]]
+        # if solve_boundary_cells:
+        #     self._canonical_faces[dim][1] = new_boundary_cell_list
         return self._canonical_faces[dim]
 
     def canonical_facets(self, solve_boundary_cells = False):
