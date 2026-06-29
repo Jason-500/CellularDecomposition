@@ -76,15 +76,47 @@ class DFV:
         return self.poly.dim()
 
     @property
+    def edge_labels(self):
+        return self._edge_labels
+    
+    # def facets(self):
+    #     """
+    #     Return the facets: [interior faces, boundary faces]
+    #     """
+    #     if self._facets: return self._facets
+    #     raw_interior_faces = []
+    #     raw_boundary_faces = []
+    #     voronoi_edge_dict = {label:(start,end) for start,end,label in self.V.edges()}
+    #     for face in self.poly.facets():
+    #         center = face.as_polyhedron().center()
+    #         index_of_collapsed_edges = [i for i, x in enumerate(center) if x == 1]
+    #         labels_of_collapsed_edges = [self.D.edges()[i][2] for i in index_of_collapsed_edges]
+
+    #         if 0 in center: # non-separating degeneration
+    #             raw_boundary_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=False))
+
+    #         elif not Graph([voronoi_edge_dict[label] for label in labels_of_collapsed_edges],multiedges=True, loops=True).is_forest(): 
+    #             # separating degeneration. I think it will always occur by pinching a single selfloop in V. But first we still detect the loop.
+    #             raw_boundary_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=False))
+
+    #         else:
+    #             raw_interior_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=True))
+    #     self._facets=[raw_interior_faces,raw_boundary_faces]
+    #     return self._facets
+    # 
+    # Reuse faces():
     def facets(self):
+        return self.faces(1)
+    
+    def faces(self, codim):
         """
-        Return the faces: [interiors, boundaries]
+        Return the faces with given codimension: [interior faces, boundary faces]
         """
-        if self._facets: return self._facets
+        if self._faces[codim]: return self._faces[codim]
         raw_interior_faces = []
         raw_boundary_faces = []
         voronoi_edge_dict = {label:(start,end) for start,end,label in self.V.edges()}
-        for face in self.poly.facets():
+        for face in self.poly.faces(codim):
             center = face.as_polyhedron().center()
             index_of_collapsed_edges = [i for i, x in enumerate(center) if x == 1]
             labels_of_collapsed_edges = [self.D.edges()[i][2] for i in index_of_collapsed_edges]
@@ -98,13 +130,9 @@ class DFV:
 
             else:
                 raw_interior_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=True))
-        self._facets=[raw_interior_faces,raw_boundary_faces]
-        return self._facets
-        
-    @property
-    def edge_labels(self):
-        return self._edge_labels
-    
+        self._faces[codim]=[raw_interior_faces,raw_boundary_faces]
+        return self._faces[codim]
+
     def return_DFV_tuple(self):
         return (self.D,self.F,self.V)
 
