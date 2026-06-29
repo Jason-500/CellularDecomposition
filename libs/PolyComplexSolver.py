@@ -38,7 +38,7 @@ class PolyComplexSolver:
         if solve_boundary_cells:
             new_boundary_cell_list = []
         for dfv in current_interior_cell:
-            interior_faces, boundary_faces = dfv.facets
+            interior_faces, boundary_faces = dfv.facets()
 
             for interior_face in interior_faces:
                 is_canonical = True
