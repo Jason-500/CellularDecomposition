@@ -173,7 +173,7 @@ def canonical_image(face,map):
     ])
     return image
 
-def is_orientation_preserving_isomorphic(DFV1, DFV2):
+def is_orientation_preserving_isomorphic(DFV1:DFV, DFV2:DFV):
     if not DFV1.V.is_isomorphic(DFV2.V):
         return False, None
     

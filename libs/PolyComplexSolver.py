@@ -30,14 +30,15 @@ class PolyComplexSolver:
         self.boundary_cell_dict = {self.top_cell_dim:[]}
         self.boundary_dim = self.top_cell_dim
         
-    def solve_boundary(self):
+    def solve_boundary(self, solve_boundary_cells = False):
         current_interior_cell = self.interior_cell_dict[self.boundary_dim]
         # current_boundary_cell = self.boundary_cell_dict[self.boundary_dim]
         # Look up all cells, take the canonical one out, set the permutations for faces.
         new_interior_cell_list = []
-        new_boundary_cell_list = []
+        if solve_boundary_cells:
+            new_boundary_cell_list = []
         for dfv in current_interior_cell:
-            interior_faces, boundary_faces = dfv.faces
+            interior_faces, boundary_faces = dfv.facets
 
             for interior_face in interior_faces:
                 is_canonical = True
@@ -52,21 +53,22 @@ class PolyComplexSolver:
                     interior_face.set_canonical()
                     new_interior_cell_list.append(interior_face)
 
-            for boundary_face in boundary_faces:
-                is_canonical = True
-                for boundary_cell in new_boundary_cell_list:
-                    is_isomorphic, permutation = boundary_cell.is_orientation_preserving_isomorphic_to(boundary_face)
-                    if is_isomorphic:
-                        boundary_face.is_canonical = False
-                        boundary_face.canonical_image = (boundary_cell,permutation) # may need to fix the direction of map here.
-                        is_canonical = False
-                        break
-                if is_canonical:
-                    boundary_face.set_canonical()
-                    new_boundary_cell_list.append(boundary_face)
+            if solve_boundary_cells:
+                for boundary_face in boundary_faces:
+                    is_canonical = True
+                    for boundary_cell in new_boundary_cell_list:
+                        is_isomorphic, permutation = boundary_cell.is_orientation_preserving_isomorphic_to(boundary_face)
+                        if is_isomorphic:
+                            boundary_face.is_canonical = False
+                            boundary_face.canonical_image = (boundary_cell,permutation) # may need to fix the direction of map here.
+                            is_canonical = False
+                            break
+                    if is_canonical:
+                        boundary_face.set_canonical()
+                        new_boundary_cell_list.append(boundary_face)
 
         # for dfv in current_boundary_cell:
-        #     interior_faces, boundary_faces = dfv.faces
+        #     interior_faces, boundary_faces = dfv.facets
 
         #     for interior_face in interior_faces:
         #         is_canonical = True
@@ -96,7 +98,8 @@ class PolyComplexSolver:
         
         self.boundary_dim -= 1
         self.interior_cell_dict[self.boundary_dim] = new_interior_cell_list
-        self.boundary_cell_dict[self.boundary_dim] = new_boundary_cell_list
+        if solve_boundary_cells:
+            self.boundary_cell_dict[self.boundary_dim] = new_boundary_cell_list
 
     def solve_boundary_till_dim(self,dim):
         while self.boundary_dim != dim:

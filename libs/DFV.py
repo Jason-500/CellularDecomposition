@@ -29,7 +29,8 @@ class DFV:
         self.card_F = len(F)
         self._poly = None
         self._dim = None
-        self._faces = None
+        self._facets = None
+        self._faces = {}
         self._edge_labels = [label for _,_,label in D.edges()]
 
         self.is_interior = None
@@ -75,11 +76,11 @@ class DFV:
         return self.poly.dim()
 
     @property
-    def faces(self):
+    def facets(self):
         """
         Return the faces: [interiors, boundaries]
         """
-        if self._faces: return self._faces
+        if self._facets: return self._facets
         raw_interior_faces = []
         raw_boundary_faces = []
         voronoi_edge_dict = {label:(start,end) for start,end,label in self.V.edges()}
@@ -97,8 +98,8 @@ class DFV:
 
             else:
                 raw_interior_faces.append(self.remove_multiple_edges(index_of_collapsed_edges,is_interior=True))
-        self._faces=[raw_interior_faces,raw_boundary_faces]
-        return self._faces
+        self._facets=[raw_interior_faces,raw_boundary_faces]
+        return self._facets
         
     @property
     def edge_labels(self):
