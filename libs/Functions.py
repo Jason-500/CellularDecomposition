@@ -147,3 +147,160 @@ def modified_faces_with_voronoi(edge,F,V):
 
     v = Graph([(mapping_v[e[0]],mapping_v[e[1]],e[2]) for e in v.edges()], multiedges=True, loops=True)
     return (f,v)
+
+def polyhedra_3d_html(poly_list, filename="polyhedra.html",
+                      opacity=0.45, frame=True,
+                      online=True, eps=1e-10,
+                      label_vertices=True,
+                      label_full_coords=False,
+                      label_fontsize=10,
+                      show_if_possible=False):
+    """
+    Export multiple high-dimensional but jointly 3D Sage Polyhedra
+    to one interactive threejs HTML file, using one shared isometric
+    coordinate system inherited from the original ambient Euclidean space.
+    """
+    if len(poly_list) == 0:
+        raise ValueError("poly_list is empty.")
+
+    ambient_dims = [P.ambient_dim() for P in poly_list]
+    if len(set(ambient_dims)) != 1:
+        raise ValueError("All polyhedra must have the same ambient dimension.")
+
+    # Collect V-representation data.
+    all_verts = []
+    all_dirs = []
+
+    per_poly_data = []
+
+    for P in poly_list:
+        verts = [vector(RDF, v) for v in P.vertex_generator()]
+        rays  = [vector(RDF, r) for r in P.ray_generator()]
+        lines = [vector(RDF, l) for l in P.line_generator()]
+
+        if len(verts) == 0:
+            raise ValueError("Each polyhedron needs at least one vertex.")
+
+        all_verts += verts
+        all_dirs += rays + lines
+
+        per_poly_data.append((P, verts, rays, lines))
+
+    if len(all_verts) == 0:
+        raise ValueError("No vertices found.")
+
+    # Shared affine base point.
+    p0 = all_verts[0]
+
+    # Directions spanning the joint affine hull.
+    dirs = [v - p0 for v in all_verts[1:]] + all_dirs
+
+    # Shared Gram-Schmidt orthonormal basis.
+    E = []
+    for b in dirs:
+        u = vector(RDF, b)
+        for e in E:
+            u -= (u * e) * e
+        n = u.norm()
+        if n > eps:
+            E.append(u / n)
+        if len(E) == 3:
+            break
+
+    if len(E) != 3:
+        raise ValueError(
+            "The joint affine span does not appear to be 3D; found dimension {}.".format(len(E))
+        )
+
+    def proj_point(x):
+        x = vector(RDF, x) - p0
+        return tuple(x * e for e in E)
+
+    def proj_dir(x):
+        x = vector(RDF, x)
+        return tuple(x * e for e in E)
+
+    # Build one combined Graphics3d object.
+    G = None
+    projected_polyhedra = []
+
+    from sage.plot.plot3d.shapes2 import text3d
+
+    for k, (P, verts, rays, lines) in enumerate(per_poly_data):
+        verts3 = [proj_point(v) for v in verts]
+        rays3  = [proj_dir(r) for r in rays]
+        lines3 = [proj_dir(l) for l in lines]
+
+        Q = Polyhedron(vertices=verts3, rays=rays3, lines=lines3)
+        projected_polyhedra.append(Q)
+
+        colors = [
+            "#0072B2",  # blue
+            "#D55E00",  # vermillion
+            "#009E73",  # green
+            "#CC79A7",  # reddish purple
+            "#E69F00",  # orange
+            "#56B4E9",  # sky blue
+            "#F0E442",  # yellow
+            "#000000",  # black
+        ]
+
+        c = colors[k % len(colors)]
+
+        if Q.dim() == 1:
+            H = Q.plot(
+                color=c,
+                thickness=4,
+                frame=frame
+            )
+        else:
+            H = Q.plot(
+                opacity=opacity,
+                frame=frame,
+                color=c
+            )
+
+        # # 非 1D 的对象再叠加 wireframe
+        # if Q.dim() > 1:
+        #     H += Q.plot(
+        #         wireframe=True,
+        #         color=c,
+        #         thickness=3
+        #     )
+
+        if label_vertices:
+            # Small offset so labels do not sit exactly on the vertices.
+            offset = vector(RDF, (0.03, 0.03, 0.03))
+
+            for i, (v_orig, v3) in enumerate(zip(verts, verts3)):
+                pos = tuple(vector(RDF, v3) + offset)
+
+                if label_full_coords:
+                    label = "P{}v{}={}".format(k, i, tuple(v_orig))
+                else:
+                    label = "P{}v{}".format(k, i)
+
+                H += text3d(label, pos, fontsize=label_fontsize)
+
+        if G is None:
+            G = H
+        else:
+            G += H
+
+    G.save(filename, viewer="threejs", online=online)
+
+    if show_if_possible:
+        try:
+            from IPython.display import IFrame, display
+            display(IFrame(filename, width=900, height=700))
+        except Exception as err:
+            print("Saved to {}, but could not display inline: {}".format(filename, err))
+
+    return projected_polyhedra, G, filename, p0, E
+
+def is_subsequence(A, B):
+    """
+    Check whether list A is a subsequence of list B (order preserved, not necessarily contiguous).
+    """
+    it = iter(B)
+    return all(any(a == b for b in it) for a in A)

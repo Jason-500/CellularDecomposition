@@ -329,11 +329,29 @@ class DFV:
                 return True
         return False
     
-    def get_isomorphic_face_list(self, face_type: "DFV"):
+    def get_faces_isomorphic_to_given_type(self, face_type: "DFV"):
         face_list = []
         for f in self.faces(face_type.dim)[0]:
             if face_type.is_orientation_preserving_isomorphic_to(f)[0]:
                 face_list.append(f)
+        return face_list
+    
+    def get_faces_containing_given_cell(self, cell: "DFV", dim=None):
+        # 没有适配boundary
+        if dim is None:
+            return {
+                d: self.get_faces_containing_given_cell(cell,d)
+                for d in range(cell.dim, self.dim + 1)
+            }
+        # B是C的边界当且仅当B的label全部被C包含.
+        if cell.root_cell != self.root_cell:
+            return None
+        
+        face_list = []
+        for f in self.faces(dim)[0]:
+            if is_subsequence(cell.edge_labels, f.edge_labels):
+                face_list.append(f)
+
         return face_list
 
     def return_DFV_tuple(self):
@@ -350,7 +368,7 @@ class DFV:
         self.is_canonical = True
         self.canonical_image = (self,DFV.id)
 
-    def automorphism_group(self):
+    def planar_graph_automorphism_group(self):
         original_grp = self.D.automorphism_group()
         canonical_faces = [canonical_face(f) for f in self.F]
         group_element_list = []
@@ -366,6 +384,33 @@ class DFV:
                 group_element_list.append(g)
 
         return PermutationGroup(group_element_list)
+    
+    def get_equivalent_coordinates(self):
+        """
+        Get the equivalence between angle coordinates, labeled by edge labels.
+        """
+        verts = list(self.poly.vertices())
+        n = self.poly.ambient_dim()
+
+        equal_pairs = []
+
+        for i in range(n):
+            if self.root_cell.edge_labels[i] in self.edge_labels:
+                for j in range(i+1, n):
+                    if all(v[i] == v[j] for v in verts):
+                        equal_pairs.append((self.root_cell.edge_labels[i], self.root_cell.edge_labels[j]))
+
+        return equal_pairs
+
+    def automorphism_group(self):
+        """
+        Get the automorphism group of the polyhedral cell.
+        """
+        element_list = []
+        for g in self.planar_graph_automorphism_group():
+            if self.get_fixed_point_set(g).dim() != self.dim:
+                element_list.append(g)
+        return PermutationGroup(element_list)
 
     def get_fixed_point_set(self,g):
         edge_label_perm= get_edge_label_permutation(self,g)
@@ -377,8 +422,8 @@ class DFV:
     
     def get_fixed_point_set_list(self, return_g = False):
         if return_g:
-            return [(g,self.get_fixed_point_set(g)) for g in self.automorphism_group()]
-        return [self.get_fixed_point_set(g) for g in self.automorphism_group()]
+            return [(g,self.get_fixed_point_set(g)) for g in self.planar_graph_automorphism_group()]
+        return [self.get_fixed_point_set(g) for g in self.planar_graph_automorphism_group()]
 
 
 
