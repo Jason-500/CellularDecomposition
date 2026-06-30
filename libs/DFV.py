@@ -1,6 +1,7 @@
 from sage.all import *
 import copy as pycopy
 from libs.Functions import *
+from libs.CustomErrors import *
 
 from itertools import combinations
 
@@ -118,6 +119,9 @@ class DFV:
                 self._init_faces(d, solve_boundary_cells)
             return
 
+        if dim in self._faces: 
+            return
+
         raw_interior_faces = []
         if solve_boundary_cells:
             raw_boundary_faces = []
@@ -174,20 +178,38 @@ class DFV:
         return self.faces(self.dim - 1, solve_boundary_cells)
     
     def init_canonical_faces(self, dim = None, solve_boundary_cells = False):
-        if not self.is_root_cell:
-            self.root_cell.init_canonical_faces(dim, solve_boundary_cells)
-            return
-        
         if dim is None:
             for d in range(self.dim + 1):
                 self.init_canonical_faces(d, solve_boundary_cells)
             return
+
+        if not self.is_root_cell:
+            self.root_cell.init_canonical_faces(dim, solve_boundary_cells) # 顶部先确定范本, 随后为所有face指派其等价类.
+            new_interior_cell_list = []
+
+            interior_faces, boundary_faces = self.faces(dim, solve_boundary_cells)
+
+            for interior_face in interior_faces:
+                if interior_face.canonical_image[0] not in new_interior_cell_list: # 按理说这里应该已经获取到了canonical image, 因为faces的策略就是为非顶部cell返回顶部cell的对应胞腔.
+                    new_interior_cell_list.append(interior_face.canonical_image[0])
+
+            self._canonical_faces[dim] = [new_interior_cell_list,[]]
+
+            if solve_boundary_cells:
+                new_boundary_cell_list = []
+                for boundary_face in boundary_faces:
+                    if boundary_face.canonical_image[0] not in new_boundary_cell_list:
+                        new_boundary_cell_list.append(boundary_face.canonical_image[0])
+
+                self._canonical_faces[dim][1] = new_boundary_cell_list
+            return
         
         if dim in self._canonical_faces: return
 
-        new_interior_cell_list = []
+        new_interior_cell_list = []# if self.is_root_cell else self.root_cell.canonical_faces(dim)[0]
+
         if solve_boundary_cells:
-            new_boundary_cell_list = []
+            new_boundary_cell_list = []# if self.is_root_cell else self.root_cell.canonical_faces(dim)[1]
 
         interior_faces, boundary_faces = self.faces(dim, solve_boundary_cells)
 
@@ -201,6 +223,8 @@ class DFV:
                     is_canonical = False
                     break
             if is_canonical:
+                if not self.is_root_cell:
+                    raise MissingCellError()
                 interior_face.set_canonical()
                 new_interior_cell_list.append(interior_face)
 
@@ -215,6 +239,8 @@ class DFV:
                         is_canonical = False
                         break
                 if is_canonical:
+                    if not self.is_root_cell:
+                        raise MissingCellError()
                     boundary_face.set_canonical()
                     new_boundary_cell_list.append(boundary_face)
 
@@ -234,24 +260,24 @@ class DFV:
         if dim in self._canonical_faces: return self._canonical_faces[dim]
 
         self.init_canonical_faces(dim, solve_boundary_cells)
-        if not self.is_root_cell:
-            new_interior_cell_list = []
+        # if not self.is_root_cell:
+        #     new_interior_cell_list = []
 
-            interior_faces, boundary_faces = self.faces(dim, solve_boundary_cells)
+        #     interior_faces, boundary_faces = self.faces(dim, solve_boundary_cells)
 
-            for interior_face in interior_faces:
-                if interior_face.canonical_image[0] not in new_interior_cell_list:
-                    new_interior_cell_list.append(interior_face.canonical_image[0])
+        #     for interior_face in interior_faces:
+        #         if interior_face.canonical_image[0] not in new_interior_cell_list:
+        #             new_interior_cell_list.append(interior_face.canonical_image[0])
 
-            self._canonical_faces[dim] = [new_interior_cell_list,[]]
+        #     self._canonical_faces[dim] = [new_interior_cell_list,[]]
 
-            if solve_boundary_cells:
-                new_boundary_cell_list = []
-                for boundary_face in boundary_faces:
-                    if boundary_face.canonical_image[0] not in new_boundary_cell_list:
-                        new_boundary_cell_list.append(boundary_face.canonical_image[0])
+        #     if solve_boundary_cells:
+        #         new_boundary_cell_list = []
+        #         for boundary_face in boundary_faces:
+        #             if boundary_face.canonical_image[0] not in new_boundary_cell_list:
+        #                 new_boundary_cell_list.append(boundary_face.canonical_image[0])
 
-                self._canonical_faces[dim][1] = new_boundary_cell_list
+        #         self._canonical_faces[dim][1] = new_boundary_cell_list
 
         # new_interior_cell_list = []
         # if solve_boundary_cells:
@@ -296,6 +322,12 @@ class DFV:
     
     # def solve_all_canonical_faces(self, solve_boundary_cells = False):
 
+    def has_canonical_face(self, face: "DFV"): 
+        # 只写了Interior部分
+        for f in self.canonical_faces(face.dim)[0]:
+            if face.is_orientation_preserving_isomorphic_to(f)[0]:
+                return True
+        return False
 
     def return_DFV_tuple(self):
         return (self.D,self.F,self.V)
