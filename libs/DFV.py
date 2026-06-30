@@ -328,6 +328,13 @@ class DFV:
             if face.is_orientation_preserving_isomorphic_to(f)[0]:
                 return True
         return False
+    
+    def get_isomorphic_face_list(self, face_type: "DFV"):
+        face_list = []
+        for f in self.faces(face_type.dim)[0]:
+            if face_type.is_orientation_preserving_isomorphic_to(f)[0]:
+                face_list.append(f)
+        return face_list
 
     def return_DFV_tuple(self):
         return (self.D,self.F,self.V)
@@ -359,7 +366,34 @@ class DFV:
                 group_element_list.append(g)
 
         return PermutationGroup(group_element_list)
+
+    def get_fixed_point_set(self,g):
+        edge_label_perm= get_edge_label_permutation(self,g)
+        orbits = orbits_of_perm(edge_label_perm,self.edge_labels)
+        eq_constraints = constraints_from_orbits(orbits, self.root_cell.edge_labels)
+
+        fxpts = Polyhedron(eqns=eq_constraints,base_ring=QQ)
+        return self.poly & fxpts
     
+    def get_fixed_point_set_list(self, return_g = False):
+        if return_g:
+            return [(g,self.get_fixed_point_set(g)) for g in self.automorphism_group()]
+        return [self.get_fixed_point_set(g) for g in self.automorphism_group()]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # methods for determining if isomorphic
 def canonical_face(face):
     n = len(face)
@@ -499,6 +533,8 @@ def get_edge_label_permutation(dfv:DFV,g):
 
     返回 label_perm, 使得
         label_perm[old_label] == new_label.
+
+    这里的 label_perm 扩充过, 以适应
     """
     return get_edge_label_map(dfv,dfv,g)
 
