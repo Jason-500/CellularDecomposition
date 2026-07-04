@@ -324,12 +324,15 @@ class DFV:
     
     # def solve_all_canonical_faces(self, solve_boundary_cells = False):
 
-    def has_canonical_face(self, face: "DFV"): 
+    def has_canonical_face(self, face_type: "DFV"): 
+        return self.get_canonical_face_isomorphic_to_given_type(face_type) != None
+            
+    def get_canonical_face_isomorphic_to_given_type(self, face_type: "DFV"):
         # 只写了Interior部分
-        for f in self.canonical_faces(face.dim)[0]:
-            if face.is_orientation_preserving_isomorphic_to(f)[0]:
-                return True
-        return False
+        for f in self.canonical_faces(face_type.dim)[0]:
+            if face_type.is_orientation_preserving_isomorphic_to(f)[0]:
+                return f
+        return None
     
     def get_faces_isomorphic_to_given_type(self, face_type: "DFV"):
         face_list = []
