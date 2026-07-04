@@ -53,6 +53,8 @@ class DFV:
         self._face_dict = {}
         self._all_faces_loaded = False
 
+        self._planar_graph_automorphism_group = None
+
     # def remove_single_edge(self,i):
     #     """
     #     Return the subgraphs obtained by removing ith edge from given Delaunay graph D, with modification of F and V.
@@ -369,6 +371,8 @@ class DFV:
         self.canonical_image = (self,DFV.id)
 
     def planar_graph_automorphism_group(self):
+        if self._planar_graph_automorphism_group: return self._planar_graph_automorphism_group
+
         original_grp = self.D.automorphism_group()
         canonical_faces = [canonical_face(f) for f in self.F]
         group_element_list = []
@@ -383,7 +387,8 @@ class DFV:
             if is_valid:
                 group_element_list.append(g)
 
-        return PermutationGroup(group_element_list)
+        self._planar_graph_automorphism_group = PermutationGroup(group_element_list)
+        return self._planar_graph_automorphism_group
     
     def get_equivalent_coordinates(self):
         """
@@ -402,13 +407,13 @@ class DFV:
 
         return equal_pairs
 
-    def automorphism_group(self):
+    def stablizer(self):
         """
-        Get the automorphism group of the polyhedral cell.
+        Get the stablizer of the orientation preserving planar isomorphism group acting on the polyhedron.
         """
-        element_list = []
+        element_list = [] # 首先确定稳定子群.
         for g in self.planar_graph_automorphism_group():
-            if self.get_fixed_point_set(g).dim() != self.dim:
+            if self.get_fixed_point_set(g).dim() == self.dim:
                 element_list.append(g)
         return PermutationGroup(element_list)
 
