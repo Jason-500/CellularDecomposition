@@ -1,5 +1,4 @@
 import sys
-sys.path.append("/home/ccsghk/CellularDecomposition")
 
 import os
 import sys
