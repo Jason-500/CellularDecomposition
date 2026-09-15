@@ -35,9 +35,13 @@ Implemented:
 For genus 2, the program reconstructs the cell complex and obtains
 
 effective orbifold Euler characteristic:
+
 $$ -1/120 $$
+
 Taking into account the universal hyperelliptic involution:
+
 $$ \chi_{orb}(M_2) = -1/240 $$
+
 which agrees with the Harer-Zagier formula.
 
 ## Current limitation
