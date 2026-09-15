@@ -37,7 +37,7 @@ testpoly2.solve_boundary_till_dim(0)
 
 from sage.all import QQ
 
-# 取出所有真正的 6-dimensional interior top cells
+# taking out all 6-dimensional interior top cells
 cell_indices_dim6 = []
 
 for i in range(len(D_raw)):
@@ -50,7 +50,7 @@ for i in range(len(D_raw)):
         cell_indices_dim6.append(i)
 
 print("number of top cells =", len(cell_indices_dim6))
-# 应该得到 10
+# should be 10
 
 top_cells = [
     DFV(

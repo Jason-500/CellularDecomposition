@@ -1,7 +1,7 @@
-## ModuliCells
+# ModuliCells
 A computational framework for constructing cellular decompositions of moduli spaces of Riemann surfaces.
 
-# Overview
+## Overview
 This project implements a combinatorial approach to moduli spaces
 of Riemann surfaces.
 
@@ -12,11 +12,11 @@ points on the sphere.
 Using Delaunay/Voronoi decompositions, we classify combinatorial
 types and construct the corresponding polyhedral cells.
 
-# Mathematical Background
+## Mathematical Background
 
 See [needs to be filled...]
 
-# Features
+## Features
 
 Implemented:
 
@@ -30,21 +30,17 @@ Implemented:
 
 ✓ Orbifold Euler characteristic computation
 
-# Example
+## Example
 
 For genus 2, the program reconstructs the cell complex and obtains
 
 effective orbifold Euler characteristic:
-
-    $$ -1/120 $$
-
+$$ -1/120 $$
 Taking into account the universal hyperelliptic involution:
-
-    $$ \chi_{orb}(M_2) = -1/240 $$
-
+$$ \chi_{orb}(M_2) = -1/240 $$
 which agrees with the Harer-Zagier formula.
 
-# Current limitation
+## Current limitation
 
 The current implementation describes the unmarked moduli problem
 through Weierstrass data.
@@ -53,7 +49,7 @@ Mapping class group actions invisible to the Weierstrass model
 (e.g. the hyperelliptic kernel) are not represented internally
 and must be accounted for separately.
 
-# Future directions
+## Future directions
 
 Future extensions:
 
